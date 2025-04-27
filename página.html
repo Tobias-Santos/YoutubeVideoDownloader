@@ -73,6 +73,13 @@
     optgroup {
       font-weight: bold;
     }
+    #nomeArquivo {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
   </style>
 </head>
 <body>
@@ -106,6 +113,9 @@
         <option>Selecione um formato...</option>
       </select>
     </div>
+
+    <label for="nomeArquivo">Nome do Arquivo (sem extensão):</label>
+    <input type="text" id="nomeArquivo" placeholder="Deixe em branco para nome automático">
 
     <button onclick="iniciarDownload()">Baixar</button>
   </div>
@@ -244,6 +254,7 @@ async function iniciarDownload() {
   const url = document.getElementById('url').value.trim();
   const tipo = document.getElementById('tipo').value;
   const format_id = document.getElementById('qualidade').value;
+  const nomeArquivo = document.getElementById('nomeArquivo').value.trim();
 
   clearMessages();
   
@@ -265,7 +276,8 @@ async function iniciarDownload() {
       body: JSON.stringify({ 
         url, 
         format_id,
-        tipo
+        tipo,
+        custom_name: nomeArquivo
       })
     });
 

@@ -56,7 +56,6 @@ app.post('/get-formats', async (req, res) => {
       ytDlp.on('error', (err) => reject(err));
     });
 
-    // Process formats to get one intermediate option per resolution
     const processedFormats = processFormats(formats);
 
     res.json({ formats: processedFormats });
@@ -72,10 +71,8 @@ app.post('/get-formats', async (req, res) => {
 function processFormats(formats) {
   const resolutionMap = {};
 
-  // Filter only video formats (not audio-only)
   const videoFormats = formats.filter(f => f.resolution && !f.channels.includes('audio'));
 
-  // Group by resolution
   videoFormats.forEach(format => {
     if (!resolutionMap[format.resolution]) {
       resolutionMap[format.resolution] = [];
@@ -83,31 +80,25 @@ function processFormats(formats) {
     resolutionMap[format.resolution].push(format);
   });
 
-  // For each resolution, find the format with most intermediate filesize
   const result = [];
   Object.keys(resolutionMap).forEach(res => {
     const formatsForRes = resolutionMap[res];
     
-    // Convert filesize to bytes for comparison
     const formatsWithSize = formatsForRes.map(f => {
       const sizeInBytes = convertToBytes(f.filesize);
       return { ...f, sizeInBytes };
     }).filter(f => !isNaN(f.sizeInBytes));
 
     if (formatsWithSize.length > 0) {
-      // Sort by filesize
       formatsWithSize.sort((a, b) => a.sizeInBytes - b.sizeInBytes);
       
-      // Get the middle one (most intermediate)
       const middleIndex = Math.floor(formatsWithSize.length / 2);
       result.push(formatsWithSize[middleIndex]);
     }
   });
 
-  // Add audio formats separately
   const audioFormats = formats.filter(f => f.channels.includes('audio'));
   if (audioFormats.length > 0) {
-    // Find the middle quality audio
     audioFormats.sort((a, b) => {
       const aRate = parseInt(a.tbr) || 0;
       const bRate = parseInt(b.tbr) || 0;
@@ -135,19 +126,19 @@ function convertToBytes(sizeString) {
   const value = parseFloat(match[1]);
   const unit = match[2];
 
-  if (!unit) return value; // assume bytes if no unit
+  if (!unit) return value;
   return value * (units[unit] || 1);
 }
 
 app.post('/download', async (req, res) => {
   try {
-    const { url, format_id, tipo } = req.body;
+    const { url, format_id, tipo, custom_name } = req.body;
 
     if (!url) throw new Error('URL é obrigatória');
     if (!format_id && tipo !== 'audio_only') throw new Error('Formato é obrigatório para vídeo');
 
     const args = [
-      '-o', 'downloads/%(title)s.%(ext)s',
+      '-o', custom_name ? `downloads/${custom_name}.%(ext)s` : 'downloads/%(title)s.%(ext)s',
       '--no-warnings',
       '--embed-thumbnail',
       '--embed-metadata'
@@ -158,15 +149,15 @@ app.post('/download', async (req, res) => {
         '-x',
         '-f', 'bestaudio',
         '--audio-format', 'aac',
-        '--postprocessor-args', 'ffmpeg:-c:a aac -b:a 192k' // Força AAC com bitrate de 192k
+        '--postprocessor-args', 'ffmpeg:-c:a aac -b:a 192k'
       );
     } else {
       args.push(
         '-f', `${format_id}+bestaudio`,
         '--merge-output-format', 'mp4',
         '--audio-format', 'aac',
-        '--force-keyframes-at-cuts', // Garante sincronização áudio/vídeo
-        '--postprocessor-args', 'ffmpeg:-c:a aac -b:a 192k' // Força re-encode para AAC
+        '--force-keyframes-at-cuts',
+        '--postprocessor-args', 'ffmpeg:-c:a aac -b:a 192k'
       );
     }
 
