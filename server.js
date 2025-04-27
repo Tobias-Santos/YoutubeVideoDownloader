@@ -154,9 +154,20 @@ app.post('/download', async (req, res) => {
     ];
 
     if (tipo === 'audio_only') {
-      args.push('-x', '-f', 'bestaudio');
+      args.push(
+        '-x',
+        '-f', 'bestaudio',
+        '--audio-format', 'aac',
+        '--postprocessor-args', 'ffmpeg:-c:a aac -b:a 192k' // Força AAC com bitrate de 192k
+      );
     } else {
-      args.push('-f', `${format_id}+bestaudio`, '--merge-output-format', 'mp4');
+      args.push(
+        '-f', `${format_id}+bestaudio`,
+        '--merge-output-format', 'mp4',
+        '--audio-format', 'aac',
+        '--force-keyframes-at-cuts', // Garante sincronização áudio/vídeo
+        '--postprocessor-args', 'ffmpeg:-c:a aac -b:a 192k' // Força re-encode para AAC
+      );
     }
 
     args.push(url);
