@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Baixar do YouTube</title>
+  <title>Downloader de YouTube</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -80,6 +80,25 @@
       border-radius: 5px;
       border: 1px solid #ccc;
     }
+    #tipoDownload {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    #opcoesPlaylist {
+      margin-top: 15px;
+      padding: 10px;
+      background-color: #f8f8f8;
+      border-radius: 5px;
+    }
+    #formatoPlaylist {
+      width: 100%;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
   </style>
 </head>
 <body>
@@ -87,8 +106,22 @@
 <div class="container">
   <h2>Downloader de YouTube</h2>
 
-  <label for="url">URL do Vídeo:</label>
-  <input type="text" id="url" placeholder="Cole o link do YouTube aqui">
+  <label for="url">URL do Vídeo/Playlist:</label>
+  <input type="text" id="url" placeholder="Cole o link do YouTube aqui (vídeo ou playlist)">
+
+  <label for="tipoDownload">Tipo de Download:</label>
+  <select id="tipoDownload" onchange="toggleOptions()">
+    <option value="single">Vídeo Único</option>
+    <option value="playlist">Playlist Inteira</option>
+  </select>
+
+  <div id="opcoesPlaylist" class="hidden">
+    <label for="formatoPlaylist">Formato da Playlist:</label>
+    <select id="formatoPlaylist">
+      <option value="audio">Somente Áudio</option>
+      <option value="video">Vídeo + Áudio</option>
+    </select>
+  </div>
 
   <button onclick="buscarFormatos()">Confirmar Link</button>
 
@@ -101,7 +134,7 @@
   <div id="success-message" class="success hidden"></div>
 
   <div id="opcoesDownload" class="hidden">
-    <label for="tipo">Tipo de Download:</label>
+    <label for="tipo">Tipo de Conteúdo:</label>
     <select id="tipo" onchange="toggleQuality()">
       <option value="video_audio">Vídeo + Áudio</option>
       <option value="audio_only">Somente Áudio</option>
@@ -114,8 +147,10 @@
       </select>
     </div>
 
-    <label for="nomeArquivo">Nome do Arquivo (sem extensão):</label>
-    <input type="text" id="nomeArquivo" placeholder="Deixe em branco para nome automático">
+    <div id="nomeArquivoDiv">
+      <label for="nomeArquivo">Nome do Arquivo (sem extensão):</label>
+      <input type="text" id="nomeArquivo" placeholder="Deixe em branco para nome automático">
+    </div>
 
     <button onclick="iniciarDownload()">Baixar</button>
   </div>
@@ -143,6 +178,13 @@ function toggleLoading(show) {
   document.getElementById('loading').style.display = show ? 'block' : 'none';
 }
 
+function toggleOptions() {
+  const tipo = document.getElementById('tipoDownload').value;
+  document.getElementById('nomeArquivoDiv').style.display = tipo === 'single' ? 'block' : 'none';
+  document.getElementById('opcoesPlaylist').style.display = tipo === 'playlist' ? 'block' : 'none';
+  document.getElementById('opcoesDownload').classList.add('hidden');
+}
+
 function toggleQuality() {
   const tipo = document.getElementById('tipo').value;
   const qualidadeDiv = document.getElementById('qualidadeDiv');
@@ -165,6 +207,12 @@ function formatDescription(format) {
 
 async function buscarFormatos() {
   const url = document.getElementById('url').value.trim();
+  const tipoDownload = document.getElementById('tipoDownload').value;
+  
+  if (tipoDownload === 'playlist') {
+    return iniciarDownloadPlaylist();
+  }
+
   const qualidadeSelect = document.getElementById('qualidade');
   const opcoesDiv = document.getElementById('opcoesDownload');
 
@@ -206,11 +254,9 @@ async function buscarFormatos() {
     defaultOption.selected = true;
     qualidadeSelect.appendChild(defaultOption);
 
-    // Separate video and audio formats
     const videoFormats = data.formats.filter(f => f.resolution);
     const audioFormats = data.formats.filter(f => !f.resolution);
 
-    // Add video formats
     if (videoFormats.length > 0) {
       const group = document.createElement('optgroup');
       group.label = 'Formatos de Vídeo';
@@ -225,12 +271,11 @@ async function buscarFormatos() {
       qualidadeSelect.appendChild(group);
     }
 
-    // Add audio format (only one)
     if (audioFormats.length > 0) {
       const group = document.createElement('optgroup');
       group.label = 'Formatos de Áudio';
       
-      const audioFormat = audioFormats[0]; // Only one audio option
+      const audioFormat = audioFormats[0];
       const option = document.createElement('option');
       option.value = audioFormat.format_id;
       option.textContent = formatDescription(audioFormat);
@@ -290,6 +335,43 @@ async function iniciarDownload() {
     showSuccess(data.message || 'Download concluído com sucesso!');
   } catch (error) {
     console.error('Erro ao iniciar download:', error);
+    showError(error.message);
+  } finally {
+    toggleLoading(false);
+  }
+}
+
+async function iniciarDownloadPlaylist() {
+  const url = document.getElementById('url').value.trim();
+  const formato = document.getElementById('formatoPlaylist').value;
+
+  clearMessages();
+  
+  if (!url) {
+    showError('Por favor, insira a URL da playlist.');
+    return;
+  }
+
+  try {
+    toggleLoading(true);
+    const response = await fetch('http://localhost:3000/download-playlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        url,
+        formato 
+      })
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok || !data.success) {
+      throw new Error(data.details || data.error || 'Erro no download da playlist');
+    }
+
+    showSuccess(data.message || 'Download da playlist concluído com sucesso!');
+  } catch (error) {
+    console.error('Erro ao baixar playlist:', error);
     showError(error.message);
   } finally {
     toggleLoading(false);
